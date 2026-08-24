@@ -16,10 +16,56 @@ configs/stage1_datasets.yaml for the Stage 1 zero-shot evaluation.
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 from pathlib import Path
 
 import yaml
+
+IMG_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
+
+
+def image_to_label_path(img_path: Path) -> Path | None:
+    """Mirrors ultralytics' own label-path derivation: it replaces the LAST
+    '<sep>images<sep>' segment in an image's path with '<sep>labels<sep>' and
+    swaps the extension for .txt. Returns None if the image path has no such
+    segment -- e.g. a folder named 'images_split' instead of 'images' -- in
+    which case ultralytics silently finds no label for ANY image and treats
+    the whole split as unlabeled "background", rather than raising early.
+    """
+    sa, sb = f"{os.sep}images{os.sep}", f"{os.sep}labels{os.sep}"
+    img_str = str(img_path)
+    if sa not in img_str:
+        return None
+    label_str = sb.join(img_str.rsplit(sa, 1))
+    return Path(label_str).with_suffix(".txt")
+
+
+def _check_labels_resolvable(split_name: str, split_path: Path) -> None:
+    images = sorted(p for p in split_path.rglob("*") if p.suffix.lower() in IMG_EXTS)
+    if not images:
+        raise FileNotFoundError(f"'{split_name}' path {split_path} contains no image files")
+
+    sample = images[0]
+    label_path = image_to_label_path(sample)
+    if label_path is None:
+        raise ValueError(
+            f"'{split_name}' images live under {split_path}, which has no '{os.sep}images{os.sep}' "
+            "path segment. Ultralytics finds labels by replacing '/images/' with '/labels/' in each "
+            "image's path -- with a folder named e.g. 'images_split' instead of 'images', that "
+            "substitution silently fails and every image gets scored as an unlabeled background. "
+            "Rename the images folder (and its label counterpart) so 'images'/'labels' appear as "
+            "literal path components, e.g. images_split/train -> images/train and "
+            "labels_split/train -> labels/train, then update data.yaml's train/val paths to match."
+        )
+
+    n_with_labels = sum(1 for img in images if image_to_label_path(img).exists())
+    if n_with_labels == 0:
+        raise FileNotFoundError(
+            f"'{split_name}': found {len(images)} images under {split_path}, but no matching label "
+            f".txt files at the expected location (e.g. {label_path}). Check that your labels folder "
+            "mirrors the images folder's structure (same subfolder names, same base filenames)."
+        )
 
 
 def validate_data_yaml(data_path: str | Path) -> dict:
@@ -49,6 +95,7 @@ def validate_data_yaml(data_path: str | Path) -> dict:
         split_path = base_dir / config[split]
         if not split_path.exists():
             raise FileNotFoundError(f"{data_path} '{split}' path does not exist: {split_path}")
+        _check_labels_resolvable(split, split_path)
 
     return config
 
