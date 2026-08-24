@@ -34,13 +34,16 @@ python -m stage1_detection.extract_frames \
   --output_dir data/hypospadias_eval/images \
   --n_per_video 8 \
   --seed 42 \
-  --classes bovie,needle_driver,forceps
+  --model_path models/yolov8_avos_best.pt
 ```
 
 This writes the JPEG frames, a `manifest.csv` (frame_id/video_id/frame_index/
 timestamp), and a `labels_template.csv` with every `label` cell **blank** --
 sampling is random and reproducible via `--seed`, but presence/absence is not
-inferred. An expert fills in 0/1 per row, and the completed file is saved as
+inferred. The template's class list is read from `--model_path`'s own class
+names (the AVOS bounding-box classes it was trained on) rather than typed out
+by hand; pass `--classes a,b,c` instead only if you want to template a subset.
+An expert fills in 0/1 per row, and the completed file is saved as
 that dataset's `labels_csv`. `load_expert_labels` (in `predict.py`) refuses to
 load a file with any blank or non-0/1 label cells, so an unfinished template
 can't accidentally be scored as ground truth.

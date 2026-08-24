@@ -139,12 +139,22 @@ def main() -> None:
         "--manifest", default=None, help="Optional CSV manifest path (defaults to <output_dir>/manifest.csv)"
     )
     parser.add_argument(
+        "--model_path",
+        default=None,
+        help=(
+            "Path to the trained YOLOv8 checkpoint. If given (and --classes is not), "
+            "the labeling template's class list is read from the checkpoint's own "
+            "class names -- the AVOS bounding-box classes it was trained on -- instead "
+            "of being typed out by hand."
+        ),
+    )
+    parser.add_argument(
         "--classes",
         default=None,
         help=(
-            "Comma-separated class list, e.g. bovie,needle_driver,forceps. "
-            "If given, also writes an UNLABELED labeling template (labels_template.csv) "
-            "for an expert to fill in presence/absence per class per frame."
+            "Comma-separated class list, only needed to override --model_path (e.g. to "
+            "template a subset of classes). If neither --classes nor --model_path is "
+            "given, no labeling template is written -- just the raw frames + manifest."
         ),
     )
     parser.add_argument(
@@ -159,8 +169,16 @@ def main() -> None:
     write_manifest(rows, manifest_path)
     print(f"Extracted {len(rows)} frames total. Manifest: {manifest_path}")
 
+    classes = None
     if args.classes:
         classes = [c.strip() for c in args.classes.split(",") if c.strip()]
+    elif args.model_path:
+        from .predict import get_model_classes
+
+        classes = get_model_classes(args.model_path)
+        print(f"Classes (from model checkpoint {args.model_path}): {classes}")
+
+    if classes:
         template_path = args.labeling_template or (Path(args.output_dir) / "labels_template.csv")
         write_labeling_template(rows, classes, template_path)
 
