@@ -64,14 +64,37 @@ def predict_presence(
 
 
 def load_expert_labels(labels_csv: str | Path) -> pd.DataFrame:
-    """Expected columns: frame_id, class, label (0/1 presence/absence)."""
+    """Expected columns: frame_id, class, label (0/1 presence/absence).
+
+    Rejects a file with any blank/non-0-1 label cells -- that's an unfinished
+    labeling template (see extract_frames.write_labeling_template), not
+    expert ground truth, and must not be silently scored as one.
+    """
     df = pd.read_csv(labels_csv)
     required = {"frame_id", "class", "label"}
     missing = required - set(df.columns)
     if missing:
         raise ValueError(f"{labels_csv} is missing required columns: {sorted(missing)}")
+
+    unlabeled_mask = df["label"].isna() | (df["label"].astype(str).str.strip() == "")
+    n_unlabeled = int(unlabeled_mask.sum())
+    if n_unlabeled:
+        raise ValueError(
+            f"{labels_csv} has {n_unlabeled}/{len(df)} rows with no label -- "
+            "this looks like an unfinished labeling template. An expert must fill in "
+            "presence/absence (0/1) for every frame/class before this file can be used "
+            "as labels_csv in the Stage 1 evaluation."
+        )
+
     df["frame_id"] = df["frame_id"].astype(str)
-    df["label"] = df["label"].astype(int)
+    try:
+        df["label"] = df["label"].astype(int)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{labels_csv} has non-0/1 values in the 'label' column: {exc}") from exc
+    if not df["label"].isin([0, 1]).all():
+        bad = sorted(df.loc[~df["label"].isin([0, 1]), "label"].unique())
+        raise ValueError(f"{labels_csv} 'label' column must be 0/1 only, found: {bad}")
+
     return df
 
 

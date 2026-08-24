@@ -13,13 +13,37 @@ or an external instrument-detection benchmark).
 ```
 configs/stage1_datasets.yaml   dataset registry: model path, classes, per-dataset image/label paths
 src/stage1_detection/
+  extract_frames.py            randomly samples frames from source videos + writes an UNLABELED
+                                labeling template for an expert to fill in presence/absence
   metrics.py                   confusion counts, accuracy/precision/recall/F1, Wilson 95% CI,
                                 binomial test vs. chance, two-proportion z-test between datasets
   predict.py                   runs YOLOv8 over a frame set -> per-frame per-class presence/absence
   report.py                    builds the per-class / pooled / pairwise-comparison CSV report
 scripts/run_stage1_eval.py     CLI: runs every dataset in the config through the pipeline
-tests/test_metrics.py          unit tests for the statistics module
+tests/                         unit tests for the statistics + frame-extraction modules
 ```
+
+## Building a labeled eval set from raw videos
+
+`hypospadias_eval` (and any other video-derived dataset) starts as **unlabeled**
+video. Extract random frames and generate a blank labeling template:
+
+```bash
+python -m stage1_detection.extract_frames \
+  --videos_dir data/hypospadias_videos \
+  --output_dir data/hypospadias_eval/images \
+  --n_per_video 8 \
+  --seed 42 \
+  --classes bovie,needle_driver,forceps
+```
+
+This writes the JPEG frames, a `manifest.csv` (frame_id/video_id/frame_index/
+timestamp), and a `labels_template.csv` with every `label` cell **blank** --
+sampling is random and reproducible via `--seed`, but presence/absence is not
+inferred. An expert fills in 0/1 per row, and the completed file is saved as
+that dataset's `labels_csv`. `load_expert_labels` (in `predict.py`) refuses to
+load a file with any blank or non-0/1 label cells, so an unfinished template
+can't accidentally be scored as ground truth.
 
 ## Expected inputs
 

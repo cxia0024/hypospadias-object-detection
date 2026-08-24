@@ -31,7 +31,12 @@ datasets:
 
   hypospadias_eval:
     images_dir: data/hypospadias_eval/images
-    labels_csv: data/hypospadias_eval/labels.csv
+    # extract_frames.py --classes ... writes labels_template.csv here with every
+    # label cell BLANK. Have an expert fill in 0/1 presence/absence per class per
+    # frame, save it as labels.csv, and only then point labels_csv at it -- until
+    # then load_expert_labels() will refuse to load labels_template.csv as-is,
+    # since it is not yet ground truth.
+    labels_csv: data/hypospadias_eval/labels.csv  # <- expert-labeled copy of labels_template.csv, not the template itself
     chance_level: 0.5
 
   # Optional additional comparator, e.g. an AVOS procedure type held out of
