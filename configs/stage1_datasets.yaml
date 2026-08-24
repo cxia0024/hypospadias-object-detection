@@ -25,7 +25,13 @@ conf_threshold: 0.25
 
 datasets:
   avos_test:
-    images_dir: data/avos_test/images
+    # images_dir should be the same images/val split used during training.
+    images_dir: data/avos/images/val
+    # labels_csv is generated (not hand-labeled) by avos_labels.py from the
+    # matching YOLO labels/val .txt files -- those ARE the expert ground truth:
+    #   python -m stage1_detection.avos_labels \
+    #     --images_dir data/avos/images/val --labels_dir data/avos/labels/val \
+    #     --model_path models/yolov8_avos_best.pt --out_csv data/avos_test/labels.csv
     labels_csv: data/avos_test/labels.csv
     chance_level: 0.5
 

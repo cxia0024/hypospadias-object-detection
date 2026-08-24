@@ -35,6 +35,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True, help="Path to stage1_datasets.yaml")
     parser.add_argument("--out", default="results/stage1", help="Output directory for the comparison report")
+    parser.add_argument(
+        "--datasets",
+        default=None,
+        help=(
+            "Comma-separated subset of dataset names from the config to run (e.g. avos_test). "
+            "Default: all datasets in the config. Useful when some datasets (e.g. hypospadias_eval) "
+            "aren't expert-labeled yet -- pairwise comparisons only cover whatever subset you run."
+        ),
+    )
     args = parser.parse_args()
 
     config = yaml.safe_load(Path(args.config).read_text())
@@ -44,8 +53,18 @@ def main() -> None:
     classes: list[str] = config.get("classes") or get_model_classes(model_path)
     print(f"Classes (from {'config' if config.get('classes') else 'model checkpoint'}): {classes}")
 
+    all_datasets = config["datasets"]
+    if args.datasets:
+        wanted = [d.strip() for d in args.datasets.split(",") if d.strip()]
+        unknown = [d for d in wanted if d not in all_datasets]
+        if unknown:
+            raise SystemExit(f"unknown dataset name(s) in --datasets: {unknown}. Config has: {list(all_datasets)}")
+        selected_datasets = {name: all_datasets[name] for name in wanted}
+    else:
+        selected_datasets = all_datasets
+
     results = []
-    for name, ds_cfg in config["datasets"].items():
+    for name, ds_cfg in selected_datasets.items():
         print(f"[{name}] running inference over {ds_cfg['images_dir']} ...")
         predictions_df = predict_presence(model_path, ds_cfg["images_dir"], classes, conf_threshold)
         labels_df = load_expert_labels(ds_cfg["labels_csv"])

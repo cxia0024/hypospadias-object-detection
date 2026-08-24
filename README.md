@@ -14,6 +14,8 @@ or an external instrument-detection benchmark).
 configs/stage1_datasets.yaml   dataset registry: model path, classes, per-dataset image/label paths
 src/stage1_detection/
   train.py                     fine-tunes a COCO-pretrained YOLOv8 checkpoint on your AVOS train/val split
+  avos_labels.py               converts AVOS's own YOLO box .txt labels into frame_id,class,label
+                                ground truth -- no new expert labeling needed for avos_test
   extract_frames.py            randomly samples frames from source videos + writes an UNLABELED
                                 labeling template for an expert to fill in presence/absence
   metrics.py                   confusion counts, accuracy/precision/recall/F1, Wilson 95% CI,
@@ -61,6 +63,31 @@ python -m stage1_detection.train \
 No GPU locally? Use `notebooks/train_yolo_colab.ipynb` -- same steps, run on
 a Colab GPU runtime, with the resulting checkpoint saved back to Drive.
 
+## Validating with AVOS
+
+`avos_test` needs the same `frame_id,class,label` ground truth format as
+every other dataset in the eval config -- but unlike `hypospadias_eval`,
+that ground truth already exists: it's the YOLO bounding-box `.txt` files
+from your train/val split. Convert them instead of relabeling anything:
+
+```bash
+python -m stage1_detection.avos_labels \
+  --images_dir path/to/avos/images/val \
+  --labels_dir path/to/avos/labels/val \
+  --model_path models/yolov8_avos_best.pt \
+  --out_csv data/avos_test/labels.csv
+```
+
+This reduces "which boxes are in this image" to "which classes are present"
+(the unit Stage 1 is scored on) -- a missing/empty `.txt` file means no
+objects were annotated in that image (a legitimate background frame in YOLO
+convention), not a labeling gap. Class order comes from `--model_path` (the
+checkpoint's own class names), which matches the `.txt` files' class indices
+since they were trained on the same AVOS data. Point `avos_test.images_dir`
+at the same `images/val` folder and `avos_test.labels_csv` at the CSV this
+writes, then run the evaluation scoped to just that dataset (see below) --
+`hypospadias_eval` isn't expert-labeled yet, so it can't be scored alongside it.
+
 ## Building a labeled eval set from raw videos
 
 `hypospadias_eval` (and any other video-derived dataset) starts as **unlabeled**
@@ -101,9 +128,17 @@ pip install -r requirements.txt
 python scripts/run_stage1_eval.py --config configs/stage1_datasets.yaml --out results/stage1
 ```
 
-This scores every dataset listed in the config (e.g. `avos_test`,
-`hypospadias_eval`, and any additional comparator you add) and writes to
-`results/stage1/`:
+Only have `avos_test` ready so far? Scope the run with `--datasets` so it
+doesn't try (and fail) to load an unlabeled `hypospadias_eval`:
+
+```bash
+python scripts/run_stage1_eval.py --config configs/stage1_datasets.yaml --out results/stage1 --datasets avos_test
+```
+
+Drop `--datasets` once every dataset you want in the comparison has a real
+`labels_csv`. This scores every dataset listed in the config (e.g.
+`avos_test`, `hypospadias_eval`, and any additional comparator you add) and
+writes to `results/stage1/`:
 
 - `per_class_metrics.csv` — accuracy, precision, recall, F1, Wilson 95% CI,
   binomial p-value vs. chance, per class per dataset
