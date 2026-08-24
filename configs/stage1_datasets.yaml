@@ -1,0 +1,41 @@
+# Registry of datasets to score with the Stage 1 (YOLOv8) instrument
+# detector, zero-shot, using the same presence/absence protocol.
+#
+# Add an entry here for every dataset you want in the comparison table --
+# e.g. the AVOS held-out test split, the hypospadias eval subset, and
+# (optionally) a domain-shift reference such as a held-out AVOS procedure
+# type never seen in training, or an external tool-detection benchmark.
+#
+# Each dataset needs:
+#   images_dir  -- directory of frames to run inference on
+#   labels_csv  -- expert presence/absence labels, columns: frame_id,class,label
+#   chance_level -- baseline proportion for the binomial test (default 0.5;
+#                   use the class's true prevalence if it's known to differ
+#                   from 50/50 and chance should reflect that)
+
+model_path: models/yolov8_avos_best.pt
+conf_threshold: 0.25
+classes:
+  - bovie
+  - needle_driver
+  - forceps
+
+datasets:
+  avos_test:
+    images_dir: data/avos_test/images
+    labels_csv: data/avos_test/labels.csv
+    chance_level: 0.5
+
+  hypospadias_eval:
+    images_dir: data/hypospadias_eval/images
+    labels_csv: data/hypospadias_eval/labels.csv
+    chance_level: 0.5
+
+  # Optional additional comparator, e.g. an AVOS procedure type held out of
+  # training entirely (isolates "new open-surgery procedure" domain shift
+  # from "new imaging setup" domain shift). Uncomment and fill in to include
+  # it in the comparison table.
+  # avos_heldout_procedure:
+  #   images_dir: data/avos_heldout_procedure/images
+  #   labels_csv: data/avos_heldout_procedure/labels.csv
+  #   chance_level: 0.5
