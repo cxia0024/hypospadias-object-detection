@@ -13,6 +13,7 @@ or an external instrument-detection benchmark).
 ```
 configs/stage1_datasets.yaml   dataset registry: model path, classes, per-dataset image/label paths
 src/stage1_detection/
+  train.py                     fine-tunes a COCO-pretrained YOLOv8 checkpoint on your AVOS train/val split
   extract_frames.py            randomly samples frames from source videos + writes an UNLABELED
                                 labeling template for an expert to fill in presence/absence
   metrics.py                   confusion counts, accuracy/precision/recall/F1, Wilson 95% CI,
@@ -20,8 +21,45 @@ src/stage1_detection/
   predict.py                   runs YOLOv8 over a frame set -> per-frame per-class presence/absence
   report.py                    builds the per-class / pooled / pairwise-comparison CSV report
 scripts/run_stage1_eval.py     CLI: runs every dataset in the config through the pipeline
-tests/                         unit tests for the statistics + frame-extraction modules
+notebooks/
+  train_yolo_colab.ipynb       Colab notebook: train on your prepared AVOS split
+  run_stage1_eval_colab.ipynb  Colab notebook: run the Stage 1 zero-shot eval
+tests/                         unit tests for the statistics + frame-extraction + training modules
 ```
+
+## Training on your AVOS train/val split
+
+Once your train/val split is ready as a standard Ultralytics YOLO dataset
+(a `data.yaml` with `train:`, `val:`, and `names:` keys, pointing at your
+image/label folders -- this script doesn't create or modify the split itself):
+
+```bash
+pip install -r requirements.txt
+python -m stage1_detection.train \
+  --data path/to/avos_data.yaml \
+  --model yolov8s.pt \
+  --epochs 100 \
+  --imgsz 640 \
+  --batch 16 \
+  --out models/yolov8_avos_best.pt
+```
+
+- `--model yolov8s.pt` is the COCO-pretrained starting point (per the
+  Methods); ultralytics downloads it automatically if not already local.
+  Swap in `yolov8n.pt` for a faster/smaller run or `yolov8m.pt`/`yolov8l.pt`
+  for more capacity if you have the GPU memory.
+- Class names come entirely from your `data.yaml`'s `names:` list -- nothing
+  in this script hardcodes AVOS's instrument classes.
+- `validate_data_yaml` checks the config and that the `train`/`val` paths
+  actually exist *before* training starts, so a typo fails immediately
+  instead of after an hour of training.
+- After training, the best checkpoint (`runs/train/avos_yolov8/weights/best.pt`)
+  is copied to `--out` (default `models/yolov8_avos_best.pt`), which is
+  exactly the `model_path` the Stage 1 eval config expects -- so you can go
+  straight from training into `run_stage1_eval.py` / `extract_frames.py`.
+
+No GPU locally? Use `notebooks/train_yolo_colab.ipynb` -- same steps, run on
+a Colab GPU runtime, with the resulting checkpoint saved back to Drive.
 
 ## Building a labeled eval set from raw videos
 
