@@ -110,15 +110,23 @@ def train_yolo(
     name: str = "avos_yolov8",
     seed: int = 0,
     **train_kwargs,
-):
+) -> Path:
     """Runs ultralytics training. `model` should be a COCO-pretrained
     checkpoint name/path (e.g. yolov8s.pt) -- ultralytics downloads it
     automatically on first use if it's not already local.
+
+    Returns the path to the best checkpoint, read directly from the
+    trainer rather than reconstructed from `project`/`name`: ultralytics
+    prepends its own task subfolder (e.g. "runs/detect") in front of
+    whatever `project` you pass, and auto-increments `name` (e.g.
+    "avos_yolov8" -> "avos_yolov8-2") if that run folder already exists
+    from a previous attempt -- so the actual save path frequently does not
+    match `Path(project) / name`.
     """
     from ultralytics import YOLO
 
     yolo = YOLO(model)
-    return yolo.train(
+    yolo.train(
         data=str(data),
         epochs=epochs,
         imgsz=imgsz,
@@ -128,9 +136,16 @@ def train_yolo(
         seed=seed,
         **train_kwargs,
     )
+    return Path(yolo.trainer.best)
 
 
 def find_best_checkpoint(project: str | Path, name: str) -> Path:
+    """Locates a checkpoint from a *known, exact* project/name (e.g. one you
+    already confirmed via a prior training run's actual save_dir). Does NOT
+    account for ultralytics' task-subfolder prefixing or name
+    auto-incrementing -- prefer using the path `train_yolo` returns instead
+    of calling this right after training.
+    """
     best = Path(project) / name / "weights" / "best.pt"
     if not best.exists():
         raise FileNotFoundError(f"expected trained checkpoint at {best}, but it doesn't exist")
@@ -155,7 +170,7 @@ def main() -> None:
     config = validate_data_yaml(args.data)
     print(f"Training on {len(config['names'])} classes: {config['names']}")
 
-    train_yolo(
+    best = train_yolo(
         data=args.data,
         model=args.model,
         epochs=args.epochs,
@@ -166,7 +181,6 @@ def main() -> None:
         seed=args.seed,
     )
 
-    best = find_best_checkpoint(args.project, args.name)
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(best, out_path)
