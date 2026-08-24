@@ -25,7 +25,8 @@ src/stage1_detection/
 scripts/run_stage1_eval.py     CLI: runs every dataset in the config through the pipeline
 notebooks/
   train_yolo_colab.ipynb       Colab notebook: train on your prepared AVOS split
-  run_stage1_eval_colab.ipynb  Colab notebook: run the Stage 1 zero-shot eval
+  validate_avos_colab.ipynb    Colab notebook: score the trained checkpoint on AVOS val
+  run_stage1_eval_colab.ipynb  Colab notebook: run the combined avos_test + hypospadias_eval comparison
 tests/                         unit tests for the statistics + frame-extraction + training modules
 ```
 
@@ -87,6 +88,9 @@ since they were trained on the same AVOS data. Point `avos_test.images_dir`
 at the same `images/val` folder and `avos_test.labels_csv` at the CSV this
 writes, then run the evaluation scoped to just that dataset (see below) --
 `hypospadias_eval` isn't expert-labeled yet, so it can't be scored alongside it.
+
+No GPU/local setup? Use `notebooks/validate_avos_colab.ipynb` -- runs this
+conversion plus the scoped `avos_test` evaluation end to end on Colab.
 
 ## Building a labeled eval set from raw videos
 
