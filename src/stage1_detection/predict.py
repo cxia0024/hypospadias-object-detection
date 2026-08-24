@@ -17,20 +17,36 @@ def list_images(images_dir: str | Path) -> list[Path]:
     return sorted(p for p in images_dir.iterdir() if p.suffix.lower() in IMAGE_EXTS)
 
 
+def get_model_classes(model_path: str) -> list[str]:
+    """The AVOS class names the checkpoint was actually trained on, in index order.
+
+    Use this instead of hardcoding a class list -- the model is the source of truth.
+    """
+    from ultralytics import YOLO
+
+    model = YOLO(model_path)
+    return [model.names[i] for i in sorted(model.names)]
+
+
 def predict_presence(
     model_path: str,
     images_dir: str | Path,
-    classes: list[str],
+    classes: list[str] | None = None,
     conf_threshold: float = 0.25,
 ) -> pd.DataFrame:
     """Returns a long-format DataFrame with columns: frame_id, class, predicted (0/1).
 
     Imports ultralytics lazily so the metrics/comparison code can be used
     (and unit-tested) without the dependency installed.
+
+    `classes` defaults to the checkpoint's own class list (via `get_model_classes`);
+    pass an explicit subset only if you want to score fewer classes than the model has.
     """
     from ultralytics import YOLO
 
     model = YOLO(model_path)
+    if classes is None:
+        classes = [model.names[i] for i in sorted(model.names)]
     name_to_class = {name.lower(): name for name in classes}
 
     records = []

@@ -22,7 +22,12 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from stage1_detection.metrics import evaluate_dataset  # noqa: E402
-from stage1_detection.predict import align_labels_and_predictions, load_expert_labels, predict_presence  # noqa: E402
+from stage1_detection.predict import (  # noqa: E402
+    align_labels_and_predictions,
+    get_model_classes,
+    load_expert_labels,
+    predict_presence,
+)
 from stage1_detection.report import write_report  # noqa: E402
 
 
@@ -33,9 +38,11 @@ def main() -> None:
     args = parser.parse_args()
 
     config = yaml.safe_load(Path(args.config).read_text())
-    classes: list[str] = config["classes"]
     model_path: str = config["model_path"]
     conf_threshold: float = config.get("conf_threshold", 0.25)
+
+    classes: list[str] = config.get("classes") or get_model_classes(model_path)
+    print(f"Classes (from {'config' if config.get('classes') else 'model checkpoint'}): {classes}")
 
     results = []
     for name, ds_cfg in config["datasets"].items():

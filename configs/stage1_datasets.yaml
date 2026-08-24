@@ -15,10 +15,13 @@
 
 model_path: models/yolov8_avos_best.pt
 conf_threshold: 0.25
-classes:
-  - bovie
-  - needle_driver
-  - forceps
+# classes are read from the checkpoint's own names by default (whatever it
+# was trained on). Only set this if you want to score a subset of the
+# model's classes instead of all of them, e.g.:
+# classes:
+#   - bovie
+#   - needle_driver
+#   - forceps
 
 datasets:
   avos_test:
