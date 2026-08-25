@@ -24,9 +24,14 @@ src/stage1_detection/
   report.py                    builds the per-class / pooled / pairwise-comparison CSV report
 scripts/run_stage1_eval.py     CLI: runs every dataset in the config through the pipeline
 notebooks/
-  train_yolo_colab.ipynb       Colab notebook: train on your prepared AVOS split
-  validate_avos_colab.ipynb    Colab notebook: score the trained checkpoint on AVOS val
-  run_stage1_eval_colab.ipynb  Colab notebook: run the combined avos_test + hypospadias_eval comparison
+  train_yolo_colab.ipynb                    Colab notebook: train on your prepared AVOS split
+  validate_avos_colab.ipynb                 Colab notebook: score the trained checkpoint on AVOS val
+  run_stage1_eval_colab.ipynb               Colab notebook: run the combined avos_test + hypospadias_eval comparison
+  train_instrument_classifier_colab.ipynb   Colab notebook: train the separate SID-RAS classifier
+src/instrument_classifier/
+  train.py                     split + train a YOLOv8 classifier on a folder-per-instrument dataset
+                                with no bounding boxes (e.g. SID-RAS) -- a separate model from the
+                                AVOS detector above, since there's no box supervision to detect on
 tests/                         unit tests for the statistics + frame-extraction + training modules
 ```
 
@@ -161,6 +166,46 @@ configured datasets. See the commented-out `avos_heldout_procedure` example
 in that file for the recommended comparator: an AVOS procedure type held out
 of training, which isolates "generalizes to a new open-surgery procedure"
 from "generalizes to the hypospadias imaging setup specifically."
+
+## Training a separate classifier on a non-bbox dataset (e.g. SID-RAS)
+
+Some instrument-photo datasets (e.g. SID-RAS) have no bounding boxes -- just
+one folder per instrument (`sidras/bovie/*.jpg`, `sidras/forceps/*.jpg`, ...).
+That's a whole-image classification dataset, not a detection one, so it
+trains a **separate** YOLOv8 classifier model (`instrument_classifier/`),
+independent of the AVOS YOLOv8 detector -- there's no box supervision here
+to train a detector on.
+
+```bash
+# 1. Split the unsplit folder-per-class data into train/val (stratified per
+#    class, so a rare instrument doesn't end up with zero val images)
+python -m instrument_classifier.train split \
+  --source_root path/to/sidras \
+  --out_root data/sidras_split \
+  --val_fraction 0.2 \
+  --seed 42
+
+# 2. Fine-tune a YOLOv8 classifier on the split
+python -m instrument_classifier.train train \
+  --data data/sidras_split \
+  --model yolov8n-cls.pt \
+  --epochs 100 \
+  --imgsz 224 \
+  --out models/sidras_classifier_best.pt
+```
+
+- `validate_classification_data` checks that `train/` and `val/` have the
+  exact same set of non-empty class subfolders before training starts, so a
+  split gone wrong (e.g. a class silently missing from val) fails immediately.
+- `--model yolov8n-cls.pt` is the ImageNet-pretrained starting point;
+  ultralytics downloads it automatically if not already local.
+- Same lesson as the detector's `train.py`: the returned checkpoint path
+  comes straight from the trainer (`yolo.trainer.best`), not reconstructed
+  from `--project`/`--name` -- ultralytics prepends its own task subfolder
+  and auto-increments the run name, so guessing the path is unreliable.
+
+No GPU locally? Use `notebooks/train_instrument_classifier_colab.ipynb` --
+same split + train steps, run on a Colab GPU runtime.
 
 ## Tests
 
