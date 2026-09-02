@@ -94,6 +94,34 @@ at the same `images/val` folder and `avos_test.labels_csv` at the CSV this
 writes, then run the evaluation scoped to just that dataset (see below) --
 `hypospadias_eval` isn't expert-labeled yet, so it can't be scored alongside it.
 
+## Excluding a video from evaluation
+
+To drop a specific video (e.g. one found to have bad annotations) from
+`avos_test` and recompute all the stats without it, without moving or
+deleting any files: first find how it's identified in your filenames
+(`ls path/to/avos/images/val | grep -i 3` or similar), then add it to that
+dataset's entry in `configs/stage1_datasets.yaml`:
+
+```yaml
+datasets:
+  avos_test:
+    images_dir: data/avos/images/val
+    labels_csv: data/avos_test/labels.csv
+    chance_level: 0.5
+    exclude_frame_id_substrings:
+      - video3
+```
+
+Rerun `scripts/run_stage1_eval.py` (see below) and every stat -- accuracy,
+Wilson CI, binomial test, pairwise comparisons -- is recomputed from
+scratch over the remaining frames only. This works whether or not you
+regenerate `avos_test`'s `labels_csv`: `predict_presence` skips excluded
+frames before inference, and the evaluation only scores frames appearing in
+*both* predictions and labels, so excluded frames drop out of the results
+either way. Pass the same list to `avos_labels.py`'s
+`--exclude_frame_id_substrings` if you also want them physically absent
+from the regenerated `labels_csv` itself, rather than just unscored.
+
 No GPU/local setup? Use `notebooks/validate_avos_colab.ipynb` -- runs this
 conversion plus the scoped `avos_test` evaluation end to end on Colab.
 

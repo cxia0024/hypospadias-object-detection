@@ -38,12 +38,20 @@ def yolo_split_to_presence_csv(
     labels_dir: str | Path,
     classes: list[str],
     out_csv: str | Path,
+    exclude_substrings: list[str] | None = None,
 ) -> Path:
     """Writes a `frame_id,class,label` CSV (the format `load_expert_labels`
     expects) from a YOLO images/ + labels/ split. `classes` must be in the
     same index order the .txt files were annotated with -- i.e. the `names:`
     list from the data.yaml used to create them (get_model_classes on a
     checkpoint trained on that same data.yaml gives the same order).
+
+    `exclude_substrings` drops any frame whose filename stem contains one of
+    the given substrings -- e.g. to remove a specific source video (once you
+    know how it's identified in your filenames, such as "video3") from the
+    evaluation without touching the underlying image/label files. Pass the
+    same list to `predict_presence` too so inference isn't wastefully run on
+    frames that will just be dropped anyway.
     """
     images_dir = Path(images_dir)
     labels_dir = Path(labels_dir)
@@ -51,7 +59,7 @@ def yolo_split_to_presence_csv(
     out_csv.parent.mkdir(parents=True, exist_ok=True)
 
     rows = []
-    for img_path in list_images(images_dir):
+    for img_path in list_images(images_dir, exclude_substrings=exclude_substrings):
         present_indices = read_yolo_label_classes(labels_dir / f"{img_path.stem}.txt")
         for idx, cls in enumerate(classes):
             rows.append([img_path.stem, cls, int(idx in present_indices)])
@@ -71,6 +79,15 @@ def main() -> None:
     parser.add_argument("--model_path", default=None, help="Derive class order from this checkpoint")
     parser.add_argument("--classes", default=None, help="Comma-separated class list, overrides --model_path")
     parser.add_argument("--out_csv", required=True, help="Where to write the frame_id,class,label CSV")
+    parser.add_argument(
+        "--exclude_frame_id_substrings",
+        default=None,
+        help=(
+            "Comma-separated substrings; any frame whose filename contains one of them is "
+            "dropped (e.g. --exclude_frame_id_substrings video3 to remove a bad source video). "
+            "Non-destructive -- the underlying image/label files are untouched."
+        ),
+    )
     args = parser.parse_args()
 
     if args.classes:
@@ -80,7 +97,13 @@ def main() -> None:
     else:
         raise SystemExit("must pass --classes or --model_path")
 
-    out = yolo_split_to_presence_csv(args.images_dir, args.labels_dir, classes, args.out_csv)
+    exclude_substrings = None
+    if args.exclude_frame_id_substrings:
+        exclude_substrings = [s.strip() for s in args.exclude_frame_id_substrings.split(",") if s.strip()]
+
+    out = yolo_split_to_presence_csv(
+        args.images_dir, args.labels_dir, classes, args.out_csv, exclude_substrings=exclude_substrings
+    )
     print(f"Wrote presence/absence ground truth for {len(classes)} classes to {out}")
 
 

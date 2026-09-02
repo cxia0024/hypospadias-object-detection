@@ -12,9 +12,18 @@ import pandas as pd
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 
 
-def list_images(images_dir: str | Path) -> list[Path]:
+def list_images(images_dir: str | Path, exclude_substrings: list[str] | None = None) -> list[Path]:
+    """`exclude_substrings`, if given, drops any image whose filename stem
+    contains one of the given substrings -- e.g. to drop a specific source
+    video (identified by however it appears in your filenames, such as
+    "video3" or "case003") from both inference and scoring without moving
+    or deleting the underlying files.
+    """
     images_dir = Path(images_dir)
-    return sorted(p for p in images_dir.iterdir() if p.suffix.lower() in IMAGE_EXTS)
+    images = sorted(p for p in images_dir.iterdir() if p.suffix.lower() in IMAGE_EXTS)
+    if exclude_substrings:
+        images = [p for p in images if not any(s in p.stem for s in exclude_substrings)]
+    return images
 
 
 def get_model_classes(model_path: str) -> list[str]:
@@ -33,6 +42,7 @@ def predict_presence(
     images_dir: str | Path,
     classes: list[str] | None = None,
     conf_threshold: float = 0.25,
+    exclude_substrings: list[str] | None = None,
 ) -> pd.DataFrame:
     """Returns a long-format DataFrame with columns: frame_id, class, predicted (0/1).
 
@@ -41,6 +51,7 @@ def predict_presence(
 
     `classes` defaults to the checkpoint's own class list (via `get_model_classes`);
     pass an explicit subset only if you want to score fewer classes than the model has.
+    `exclude_substrings` drops matching frames before running inference -- see `list_images`.
     """
     from ultralytics import YOLO
 
@@ -50,7 +61,7 @@ def predict_presence(
     name_to_class = {name.lower(): name for name in classes}
 
     records = []
-    for img_path in list_images(images_dir):
+    for img_path in list_images(images_dir, exclude_substrings=exclude_substrings):
         result = model.predict(source=str(img_path), conf=conf_threshold, verbose=False)[0]
         present = set()
         for box in result.boxes:

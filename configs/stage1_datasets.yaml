@@ -12,6 +12,10 @@
 #   chance_level -- baseline proportion for the binomial test (default 0.5;
 #                   use the class's true prevalence if it's known to differ
 #                   from 50/50 and chance should reflect that)
+#   exclude_frame_id_substrings -- optional list; drops any frame whose filename
+#                   contains one of these substrings before inference/scoring
+#                   (e.g. to remove a specific bad source video), without
+#                   touching the underlying image/label files on disk.
 
 model_path: models/yolov8_avos_best.pt
 conf_threshold: 0.25
@@ -34,6 +38,11 @@ datasets:
     #     --model_path models/yolov8_avos_best.pt --out_csv data/avos_test/labels.csv
     labels_csv: data/avos_test/labels.csv
     chance_level: 0.5
+    # To drop a bad video (e.g. "video 3") from this dataset without touching
+    # files on disk, uncomment and set to whatever substring identifies it in
+    # your filenames (check with e.g. `ls data/avos/images/val | grep -i 3`):
+    # exclude_frame_id_substrings:
+    #   - video3
 
   hypospadias_eval:
     images_dir: data/hypospadias_eval/images

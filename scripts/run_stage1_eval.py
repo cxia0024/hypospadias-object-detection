@@ -65,8 +65,13 @@ def main() -> None:
 
     results = []
     for name, ds_cfg in selected_datasets.items():
+        exclude_substrings = ds_cfg.get("exclude_frame_id_substrings")
         print(f"[{name}] running inference over {ds_cfg['images_dir']} ...")
-        predictions_df = predict_presence(model_path, ds_cfg["images_dir"], classes, conf_threshold)
+        if exclude_substrings:
+            print(f"[{name}] excluding frames matching: {exclude_substrings}")
+        predictions_df = predict_presence(
+            model_path, ds_cfg["images_dir"], classes, conf_threshold, exclude_substrings=exclude_substrings
+        )
         labels_df = load_expert_labels(ds_cfg["labels_csv"])
         labels_by_class, predictions_by_class = align_labels_and_predictions(labels_df, predictions_df, classes)
 
