@@ -100,7 +100,10 @@ To drop a specific video (e.g. one found to have bad annotations) from
 `avos_test` and recompute all the stats without it, without moving or
 deleting any files: first find how it's identified in your filenames
 (`ls path/to/avos/images/val | grep -i 3` or similar), then add it to that
-dataset's entry in `configs/stage1_datasets.yaml`:
+dataset's entry in `configs/stage1_datasets.yaml`. Match by **prefix**
+(the filename must *start with* the value), and include the separator --
+e.g. `"3_"` for filenames like `3_frame001.jpg` -- so excluding video 3
+doesn't also catch video 30:
 
 ```yaml
 datasets:
@@ -108,8 +111,8 @@ datasets:
     images_dir: data/avos/images/val
     labels_csv: data/avos_test/labels.csv
     chance_level: 0.5
-    exclude_frame_id_substrings:
-      - video3
+    exclude_frame_id_prefixes:
+      - "3_"
 ```
 
 Rerun `scripts/run_stage1_eval.py` (see below) and every stat -- accuracy,
@@ -119,7 +122,7 @@ regenerate `avos_test`'s `labels_csv`: `predict_presence` skips excluded
 frames before inference, and the evaluation only scores frames appearing in
 *both* predictions and labels, so excluded frames drop out of the results
 either way. Pass the same list to `avos_labels.py`'s
-`--exclude_frame_id_substrings` if you also want them physically absent
+`--exclude_frame_id_prefixes` if you also want them physically absent
 from the regenerated `labels_csv` itself, rather than just unscored.
 
 No GPU/local setup? Use `notebooks/validate_avos_colab.ipynb` -- runs this

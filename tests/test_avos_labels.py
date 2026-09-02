@@ -85,9 +85,28 @@ def test_yolo_split_to_presence_csv_excludes_matching_frames(tmp_path):
         (labels_dir / f"{video}_frame0.txt").write_text("0 0.5 0.5 0.1 0.1\n")
 
     out_csv = tmp_path / "labels.csv"
-    yolo_split_to_presence_csv(images_dir, labels_dir, ["bovie"], out_csv, exclude_substrings=["video3"])
+    yolo_split_to_presence_csv(images_dir, labels_dir, ["bovie"], out_csv, exclude_prefixes=["video3"])
 
     with open(out_csv) as f:
         frame_ids = {row["frame_id"] for row in csv.DictReader(f)}
 
     assert frame_ids == {"video1_frame0", "video2_frame0"}
+
+
+def test_yolo_split_to_presence_csv_exclude_prefix_avoids_collision(tmp_path):
+    images_dir = tmp_path / "images" / "val"
+    labels_dir = tmp_path / "labels" / "val"
+    images_dir.mkdir(parents=True)
+    labels_dir.mkdir(parents=True)
+
+    for video in ("3", "30", "13"):
+        (images_dir / f"{video}_frame0.jpg").write_bytes(b"fake")
+        (labels_dir / f"{video}_frame0.txt").write_text("0 0.5 0.5 0.1 0.1\n")
+
+    out_csv = tmp_path / "labels.csv"
+    yolo_split_to_presence_csv(images_dir, labels_dir, ["bovie"], out_csv, exclude_prefixes=["3_"])
+
+    with open(out_csv) as f:
+        frame_ids = {row["frame_id"] for row in csv.DictReader(f)}
+
+    assert frame_ids == {"13_frame0", "30_frame0"}

@@ -38,7 +38,7 @@ def yolo_split_to_presence_csv(
     labels_dir: str | Path,
     classes: list[str],
     out_csv: str | Path,
-    exclude_substrings: list[str] | None = None,
+    exclude_prefixes: list[str] | None = None,
 ) -> Path:
     """Writes a `frame_id,class,label` CSV (the format `load_expert_labels`
     expects) from a YOLO images/ + labels/ split. `classes` must be in the
@@ -46,12 +46,13 @@ def yolo_split_to_presence_csv(
     list from the data.yaml used to create them (get_model_classes on a
     checkpoint trained on that same data.yaml gives the same order).
 
-    `exclude_substrings` drops any frame whose filename stem contains one of
-    the given substrings -- e.g. to remove a specific source video (once you
-    know how it's identified in your filenames, such as "video3") from the
-    evaluation without touching the underlying image/label files. Pass the
-    same list to `predict_presence` too so inference isn't wastefully run on
-    frames that will just be dropped anyway.
+    `exclude_prefixes` drops any frame whose filename stem *starts with* one
+    of the given prefixes -- e.g. to remove a specific source video from the
+    evaluation without touching the underlying image/label files. Include
+    the separator (e.g. "3_" not bare "3") if filenames look like
+    "3_frame001.jpg", so excluding video 3 doesn't also catch video 30.
+    Pass the same list to `predict_presence` too so inference isn't
+    wastefully run on frames that will just be dropped anyway.
     """
     images_dir = Path(images_dir)
     labels_dir = Path(labels_dir)
@@ -59,7 +60,7 @@ def yolo_split_to_presence_csv(
     out_csv.parent.mkdir(parents=True, exist_ok=True)
 
     rows = []
-    for img_path in list_images(images_dir, exclude_substrings=exclude_substrings):
+    for img_path in list_images(images_dir, exclude_prefixes=exclude_prefixes):
         present_indices = read_yolo_label_classes(labels_dir / f"{img_path.stem}.txt")
         for idx, cls in enumerate(classes):
             rows.append([img_path.stem, cls, int(idx in present_indices)])
@@ -80,11 +81,12 @@ def main() -> None:
     parser.add_argument("--classes", default=None, help="Comma-separated class list, overrides --model_path")
     parser.add_argument("--out_csv", required=True, help="Where to write the frame_id,class,label CSV")
     parser.add_argument(
-        "--exclude_frame_id_substrings",
+        "--exclude_frame_id_prefixes",
         default=None,
         help=(
-            "Comma-separated substrings; any frame whose filename contains one of them is "
-            "dropped (e.g. --exclude_frame_id_substrings video3 to remove a bad source video). "
+            "Comma-separated prefixes; any frame whose filename starts with one of them is "
+            "dropped (e.g. --exclude_frame_id_prefixes 3_ to remove video 3, given filenames "
+            "like 3_frame001.jpg -- include the separator so video 3 doesn't also match video 30). "
             "Non-destructive -- the underlying image/label files are untouched."
         ),
     )
@@ -97,12 +99,12 @@ def main() -> None:
     else:
         raise SystemExit("must pass --classes or --model_path")
 
-    exclude_substrings = None
-    if args.exclude_frame_id_substrings:
-        exclude_substrings = [s.strip() for s in args.exclude_frame_id_substrings.split(",") if s.strip()]
+    exclude_prefixes = None
+    if args.exclude_frame_id_prefixes:
+        exclude_prefixes = [s.strip() for s in args.exclude_frame_id_prefixes.split(",") if s.strip()]
 
     out = yolo_split_to_presence_csv(
-        args.images_dir, args.labels_dir, classes, args.out_csv, exclude_substrings=exclude_substrings
+        args.images_dir, args.labels_dir, classes, args.out_csv, exclude_prefixes=exclude_prefixes
     )
     print(f"Wrote presence/absence ground truth for {len(classes)} classes to {out}")
 

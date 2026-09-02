@@ -12,17 +12,19 @@ import pandas as pd
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 
 
-def list_images(images_dir: str | Path, exclude_substrings: list[str] | None = None) -> list[Path]:
-    """`exclude_substrings`, if given, drops any image whose filename stem
-    contains one of the given substrings -- e.g. to drop a specific source
-    video (identified by however it appears in your filenames, such as
-    "video3" or "case003") from both inference and scoring without moving
-    or deleting the underlying files.
+def list_images(images_dir: str | Path, exclude_prefixes: list[str] | None = None) -> list[Path]:
+    """`exclude_prefixes`, if given, drops any image whose filename stem
+    *starts with* one of the given prefixes -- e.g. to drop a specific
+    source video from both inference and scoring without moving or deleting
+    the underlying files. Prefix (not "contains anywhere") matching so
+    excluding video 3 doesn't also catch video 30 or video 13 -- include the
+    separator in the prefix (e.g. "3_" rather than bare "3") if filenames are
+    like "3_frame001.jpg", since "3_" doesn't prefix-match "30_frame001.jpg".
     """
     images_dir = Path(images_dir)
     images = sorted(p for p in images_dir.iterdir() if p.suffix.lower() in IMAGE_EXTS)
-    if exclude_substrings:
-        images = [p for p in images if not any(s in p.stem for s in exclude_substrings)]
+    if exclude_prefixes:
+        images = [p for p in images if not any(p.stem.startswith(prefix) for prefix in exclude_prefixes)]
     return images
 
 
@@ -42,7 +44,7 @@ def predict_presence(
     images_dir: str | Path,
     classes: list[str] | None = None,
     conf_threshold: float = 0.25,
-    exclude_substrings: list[str] | None = None,
+    exclude_prefixes: list[str] | None = None,
 ) -> pd.DataFrame:
     """Returns a long-format DataFrame with columns: frame_id, class, predicted (0/1).
 
@@ -51,7 +53,7 @@ def predict_presence(
 
     `classes` defaults to the checkpoint's own class list (via `get_model_classes`);
     pass an explicit subset only if you want to score fewer classes than the model has.
-    `exclude_substrings` drops matching frames before running inference -- see `list_images`.
+    `exclude_prefixes` drops matching frames before running inference -- see `list_images`.
     """
     from ultralytics import YOLO
 
@@ -61,7 +63,7 @@ def predict_presence(
     name_to_class = {name.lower(): name for name in classes}
 
     records = []
-    for img_path in list_images(images_dir, exclude_substrings=exclude_substrings):
+    for img_path in list_images(images_dir, exclude_prefixes=exclude_prefixes):
         result = model.predict(source=str(img_path), conf=conf_threshold, verbose=False)[0]
         present = set()
         for box in result.boxes:
