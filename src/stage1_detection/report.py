@@ -52,6 +52,9 @@ def pooled_table(results: list[DatasetEvalResult]) -> pd.DataFrame:
                 "accuracy": result.pooled_accuracy,
                 "wilson_ci_low": lo,
                 "wilson_ci_high": hi,
+                "precision": result.pooled_precision,
+                "recall": result.pooled_recall,
+                "f1": result.pooled_f1,
                 "binomial_p_vs_chance": result.pooled_binomial_p_vs_chance(),
             }
         )
@@ -95,5 +98,9 @@ def write_report(results: list[DatasetEvalResult], out_dir: str | Path) -> None:
     summary = {
         "datasets": [r.dataset_name for r in results],
         "pooled_accuracy": {r.dataset_name: r.pooled_accuracy for r in results},
+        # STAGE1_DETECTION_F1: the single number Stage 1 reports as its own
+        # detector's accuracy, per dataset -- micro-averaged F1 pooled across
+        # all classes (see DatasetEvalResult.pooled_f1).
+        "stage1_detection_f1": {r.dataset_name: r.pooled_f1 for r in results},
     }
     (out_dir / "summary.json").write_text(json.dumps(summary, indent=2))

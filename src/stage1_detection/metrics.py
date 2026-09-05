@@ -134,6 +134,29 @@ class DatasetEvalResult:
         c = self.pooled_counts
         return (c.tp + c.tn) / c.n if c.n else float("nan")
 
+    @property
+    def pooled_precision(self) -> float:
+        c = self.pooled_counts
+        return c.tp / (c.tp + c.fp) if (c.tp + c.fp) else float("nan")
+
+    @property
+    def pooled_recall(self) -> float:
+        c = self.pooled_counts
+        return c.tp / (c.tp + c.fn) if (c.tp + c.fn) else float("nan")
+
+    @property
+    def pooled_f1(self) -> float:
+        """Micro-averaged F1: precision/recall computed from tp/fp/fn pooled
+        (summed) across all classes first, then combined -- classes with more
+        instances weigh proportionally more, unlike a macro average of each
+        class's own F1. This is the single number "how good is the Stage 1
+        detector, overall" collapses to.
+        """
+        p, r = self.pooled_precision, self.pooled_recall
+        if np.isnan(p) or np.isnan(r) or (p + r) == 0:
+            return float("nan")
+        return 2 * p * r / (p + r)
+
     def pooled_wilson_ci(self, confidence: float = 0.95) -> tuple[float, float]:
         c = self.pooled_counts
         return wilson_ci(c.tp + c.tn, c.n, confidence=confidence)
